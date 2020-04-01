@@ -1,186 +1,26 @@
-/* Create macros so that the matrices are stored in column-major order */
 #include <stdlib.h>
 #include <stdio.h>
 
-#define A(i, j) a->arr[ (i)*a->size + (j) ]
-#define B(i, j) b->arr[ (i)*b->size + (j) ]
+#include "Strassen_utils.h"
+
 #define C(i, j) c->arr[ (i)*c->size + (j) ]
-#define D(i, j) d->arr[ (i)*d->size + (j) ]
-#define R(i, j) r->arr[ (i)*r->size + (j) ]
 
-const int MIN_SIZE = 4;
-
-typedef struct {
-    double *arr;
-    int size;
-} Matrix;
-
-Matrix *make_matrix(int size) {
-    Matrix *new = malloc(sizeof(Matrix));
-    new->size = size;
-    new->arr = (double *) malloc(size * size * sizeof(double));
-    return new;
-}
-
-Matrix *to_matrix(double *a, int size) {
-    Matrix *new = malloc(sizeof(Matrix));
-    new->size = size;
-    new->arr = a;
-    return new;
-}
-
-void free_matrix(Matrix *a) {
-    free(a->arr);
-    free(a);
-}
-
-void print_mat(Matrix *a) {
-    for (int i = 0; i < a->size; i++) {
-        for (int j = 0; j < a->size; j++) {
-            printf("%f\t", A(i, j));
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-
-Matrix *sum_matrix(Matrix *a, Matrix *b) {
-    Matrix *c = make_matrix(a->size);
-
-    for (int i = 0; i < c->size; i++) {
-        for (int j = 0; j < c->size; j++) {
-            C(i, j) = A(i, j) + B(i, j);
-        }
-    }
-
-    return c;
-}
-
-Matrix *subtract_matrix(Matrix *a, Matrix *b) {
-    Matrix *c = make_matrix(a->size);
-
-    for (int i = 0; i < c->size; i++) {
-        for (int j = 0; j < c->size; j++) {
-            C(i, j) = A(i, j) - B(i, j);
-        }
-    }
-
-    return c;
-}
-
-Matrix *mult_matrix(Matrix *a, Matrix *b) {
-    Matrix *c = make_matrix(a->size);
-
-    for (int i = 0; i < c->size; i++) {
-        for (int j = 0; j < c->size; j++) {
-            for (int p = 0; p < c->size; p++) {
-                C(i, j) += A(i, p) * B(p, j);
-            }
-        }
-    }
-
-    return c;
-}
-
-Matrix *compute_c11(Matrix *a, Matrix *b, Matrix *c, Matrix *d) {
-    Matrix *r = make_matrix(a->size);
-
-    for (int i = 0; i < c->size; i++) {
-        for (int j = 0; j < c->size; j++) {
-            R(i, j) = A(i, j) + B(i, j) - C(i, j) + D(i, j);
-        }
-    }
-
-    return r;
-}
-
-Matrix *compute_c22(Matrix *a, Matrix *b, Matrix *c, Matrix *d) {
-    Matrix *r = make_matrix(a->size);
-
-    for (int i = 0; i < c->size; i++) {
-        for (int j = 0; j < c->size; j++) {
-            R(i, j) = A(i, j) - B(i, j) + C(i, j) + D(i, j);
-        }
-    }
-
-    return r;
-}
-
-Matrix *subdivide(Matrix *a, int start_row, int start_col) {
-    int size = a->size / 2;
-
-    if (size < MIN_SIZE) {
-        printf("Trying to divide matrix smaller than MIN_SIZE = %d\n", MIN_SIZE);
-        exit(1);
-    }
-
-    Matrix *new = malloc(sizeof(Matrix));
-    new->size = size;
-    new->arr = (double *) malloc(size * size * sizeof(double));
-
-    int end_row = start_row + size;
-    int end_col = start_col + size;
-    int new_index = 0;
-    for (int i = start_row; i < end_row; i++) {
-        for (int j = start_col; j < end_col; j++) {
-            new->arr[new_index++] = A(i, j);
-        }
-    }
-    return new;
-}
-
-Matrix *merge(Matrix *a, Matrix *b, Matrix *c, Matrix *d) {
-    int size = a->size * 2;
-    int half_size = size/2;
-    Matrix *r = malloc(sizeof(Matrix));
-    r->size = size;
-    r->arr = (double *) malloc(size * size * sizeof(double));
-
-    // c11
-    int index = 0;
-    for (int i = 0; i < half_size; i++) {
-        for (int j = 0; j < half_size; j++) {
-            R(i, j) = a->arr[index++];
-        }
-    }
-
-    // c12
-    index = 0;
-    for (int i = 0; i < half_size; i++) {
-        for (int j = half_size; j < size; j++) {
-            R(i, j) = b->arr[index++];
-        }
-    }
-
-    // c21
-    index = 0;
-    for (int i = half_size; i < size; i++) {
-        for (int j = 0; j < half_size; j++) {
-            R(i, j) = c->arr[index++];
-        }
-    }
-
-    // c22
-    index = 0;
-    for (int i = half_size; i < size; i++) {
-        for (int j = half_size; j < size; j++) {
-            R(i, j) = d->arr[index++];
-        }
-    }
-
-    return r;
-}
-
+/**
+ * Matrix multiplication with Strassen algorithm
+ * @param matrix_a: input matrix a
+ * @param matrix_b: input matrix c
+ * @return: a newly allocated resulting matrix
+ */
 Matrix *Strassen_MMult(Matrix *matrix_a, Matrix *matrix_b) {
     int size = matrix_a->size;
-    int half_size = size/2;
-    
+    int half_size = size / 2;
+
     // Base case
     if (size <= MIN_SIZE) {
         return mult_matrix(matrix_a, matrix_b);
     }
 
-    // Sub-divide
+    // Sub-divide matrices A and B
     Matrix *a11 = subdivide(matrix_a, 0, 0);
     Matrix *a12 = subdivide(matrix_a, 0, half_size);
     Matrix *a21 = subdivide(matrix_a, half_size, 0);
@@ -191,6 +31,7 @@ Matrix *Strassen_MMult(Matrix *matrix_a, Matrix *matrix_b) {
     Matrix *b21 = subdivide(matrix_b, half_size, 0);
     Matrix *b22 = subdivide(matrix_b, half_size, half_size);
 
+    // add and subtract matrix a and b
     Matrix *a11_p_a22 = sum_matrix(a11, a22);
     Matrix *b11_p_b22 = sum_matrix(b11, b22);
     Matrix *a21_p_a22 = sum_matrix(a21, a22);
@@ -211,6 +52,7 @@ Matrix *Strassen_MMult(Matrix *matrix_a, Matrix *matrix_b) {
     Matrix *p6 = Strassen_MMult(a21_s_a11, b11_p_b12);
     Matrix *p7 = Strassen_MMult(a12_s_a22, b21_p_b22);
 
+    // free intermediate matrices
     free_matrix(a11);
     free_matrix(a12);
     free_matrix(a21);
