@@ -1,0 +1,23 @@
+FILES := MMult0 MMult_1x4_9 MMult_1x4_9 MMult_4x4_10 MMult_4x4_11 MMult_4x4_15 Strassen
+
+
+%.o: %.c
+	gcc -O2 -Wall -msse3 -c $< -o $@
+
+all:
+	make clean;
+	make compare_matrix_multi.x;
+
+compare_matrix_multi.x: compare_matrix_multi.o $(NEW).o utils.o
+		gcc compare_matrix_multi.o $(NEW).o utils.o -o compare_matrix_multi.x
+
+run:
+	for FILE in $(FILES) ; do \
+		NEW = $$FILE; \
+		make all; \
+		echo "Size,Gflops,Diff" > output_$$FILE.csv; \
+		./compare_matrix_multi.x >> output_$$FILE.csv; \
+	done
+
+clean:
+	rm -f *.o *~ core *.x
